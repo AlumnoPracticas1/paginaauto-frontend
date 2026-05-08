@@ -890,9 +890,14 @@
 
 <script>
 // ============== STATE & CONFIG ==============
-const DEFAULT_API = (location.protocol === 'http:' || location.protocol === 'https:')
-  ? location.origin
-  : 'http://localhost:4000';
+// __API_BASE__ se sustituye en build por Vercel (env var API_BASE).
+// Si no se sustituye (dev local abriendo el archivo, o build sin var), cae al fallback.
+const INJECTED_API = '__API_BASE__';
+const DEFAULT_API = INJECTED_API.startsWith('http')
+  ? INJECTED_API
+  : ((location.protocol === 'http:' || location.protocol === 'https:')
+      ? location.origin
+      : 'http://localhost:4000');
 
 const cfg = loadCfg();
 let API = cfg.api;

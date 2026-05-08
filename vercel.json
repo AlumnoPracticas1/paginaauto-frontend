@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "node -e \"const fs=require('fs');const v=process.env.API_BASE||'';let h=fs.readFileSync('index.html','utf8');h=h.replace(/__API_BASE__/g,v);fs.writeFileSync('index.html',h);console.log('Injected API_BASE='+(v||'(empty)'))\"",
+  "outputDirectory": ".",
+  "installCommand": "echo skip",
+  "framework": null
+}
