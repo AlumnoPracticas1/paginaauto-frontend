@@ -469,6 +469,7 @@
   .feed-title .right { display: flex; gap: 12px; align-items: center; }
 
   .error-card {
+    position: relative;
     background: var(--panel);
     border: 1px solid var(--border);
     border-left: 4px solid var(--muted);
@@ -496,6 +497,28 @@
     0% { background: rgba(86,156,214,0.25); border-color: var(--accent); }
     100% { background: var(--panel); }
   }
+
+  .card-del {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    width: 20px;
+    height: 20px;
+    line-height: 18px;
+    text-align: center;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.12s, color 0.12s, border-color 0.12s, background 0.12s;
+  }
+  .error-card:hover .card-del,
+  .css-card:hover .card-del { opacity: 1; }
+  .card-del:hover { color: var(--red); border-color: var(--red); background: rgba(239,68,68,0.12); }
 
   .err-row1 { display: flex; gap: 8px; align-items: center; margin-bottom: 4px; flex-wrap: wrap; }
   .pill {
@@ -525,6 +548,7 @@
   .pill.count.low { background: var(--yellow); border-color: var(--yellow); color: var(--bg); box-shadow: none; }
 
   .css-card {
+    position: relative;
     background: var(--panel);
     border: 1px solid var(--border);
     border-left: 4px solid var(--purple);
@@ -579,6 +603,8 @@
   }
   .btn-repair:hover { opacity: 0.85; }
   .btn-repair:disabled { opacity: 0.4; cursor: wait; }
+  /* "Arreglar con Base de datos" — usa el mismo tamaño que btn-repair pero en verde/teal */
+  .btn-db { background: linear-gradient(90deg, #16a34a, #0d9488); }
   .btn-approve { background: var(--green); color: var(--bg); border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: 700; font-size: 11px; }
   .btn-reject { background: var(--red); color: white; border: none; padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: 700; font-size: 11px; }
 
@@ -632,6 +658,11 @@
   .catalog-box .ck { color: var(--green); font-weight: 700; font-family: 'Consolas', monospace; }
   .catalog-box .row { margin-top: 4px; }
   .catalog-box .row .lbl { color: var(--muted); text-transform: uppercase; font-size: 9px; letter-spacing: 1.5px; }
+  .catalog-box .row code { font-family: 'Consolas', monospace; background: rgba(255,255,255,.06); padding: 1px 4px; border-radius: 3px; }
+  .fix-badge { display: inline-block; margin-left: 6px; font-size: 9px; padding: 2px 6px; border-radius: 999px; font-weight: 700; letter-spacing: .5px; vertical-align: middle; }
+  .fix-badge.fix-auto   { background: rgba(34,197,94,.18);  color: #4ade80; border: 1px solid rgba(34,197,94,.4); }
+  .fix-badge.fix-ai     { background: rgba(59,130,246,.18); color: #60a5fa; border: 1px solid rgba(59,130,246,.4); }
+  .fix-badge.fix-manual { background: rgba(245,158,11,.18); color: #fbbf24; border: 1px solid rgba(245,158,11,.4); }
   .timestamp { margin-left: auto; font-size: 10px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
   .err-msg {
@@ -865,6 +896,9 @@
   <section class="feed">
     <div class="feed-title">
       <span id="feedHeader">FLUJO EN VIVO · refresco 3s</span>
+      <span class="right">
+        <button class="btn danger" id="btnClearErrors" title="Borra del panel todos los errores detectados (no se puede deshacer)">🗑 LIMPIAR ERRORES</button>
+      </span>
     </div>
     <div class="alert-banner" id="alertBanner">⚠️ NUEVO ERROR URGENTE DETECTADO</div>
     <div id="feedList"></div>
@@ -1201,6 +1235,7 @@ function render(newIds = []) {
       const selector = extra.selector || '(sin selector)';
       return `
         <div class="css-card ${isNew ? 'new' : ''} ${sel}" data-id="${escapeHtml(e.id)}">
+          <div class="card-del" data-del title="Borrar ${g.count > 1 ? `estas ${g.count} ocurrencias` : 'este error'}">✕</div>
           <div class="err-row1">
             ${countPill}
             <span class="pill" style="background:rgba(168,85,247,0.18);color:var(--purple);border:1px solid var(--purple);">💡 SUGERENCIA CSS</span>
@@ -1216,6 +1251,7 @@ function render(newIds = []) {
 
     return `
       <div class="error-card priority-${prio} ${isNew ? 'new' : ''} ${sel}" data-id="${escapeHtml(e.id)}">
+        <div class="card-del" data-del title="Borrar ${g.count > 1 ? `estas ${g.count} ocurrencias` : 'este error'}">✕</div>
         <div class="err-row1">
           ${countPill}
           <span class="pill ${prio}">${prio}</span>
@@ -1233,6 +1269,14 @@ function render(newIds = []) {
   }).join('');
 
   document.querySelectorAll('.error-card, .css-card').forEach(card => {
+    const delBtn = card.querySelector('.card-del');
+    if (delBtn) {
+      delBtn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const g = groups.find(gr => gr.ids.includes(card.dataset.id));
+        deleteErrors(g ? g.ids : [card.dataset.id]);
+      });
+    }
     card.addEventListener('click', () => {
       // Encuentra el grupo al que pertenece esta tarjeta y mete TODOS sus ids
       // en state.groupIds para poder navegarlos con ◀ ▶.
@@ -1391,6 +1435,7 @@ document.addEventListener('keydown', (ev) => {
 
 async function loadDetail(id) {
   state.selectedId = id;
+  window.__lastCat = null;
   $('detailHeader').textContent = 'Detalle';
   document.querySelectorAll('.error-card').forEach(c => c.classList.toggle('selected', c.dataset.id === id));
   $('detail').innerHTML = '<div class="detail-empty">Cargando…</div>';
@@ -1417,12 +1462,20 @@ async function loadDetail(id) {
         const list = cr.ok ? await cr.json() : [];
         const cat = list.find(c => c.code === e.catalog_code);
         if (cat) {
+          window.__lastCat = cat;
+          const ft = cat.fix_type || 'ai';
+          const ftBadge = ft === 'replace'
+            ? '<span class="fix-badge fix-auto">✅ Arreglo automático (sin IA)</span>'
+            : ft === 'ai'
+              ? '<span class="fix-badge fix-ai">🤖 Arreglable con IA</span>'
+              : '<span class="fix-badge fix-manual">✋ Requiere acción manual</span>';
           catBlock = `
             <div class="catalog-box">
-              <div><span class="ck">${escapeHtml(cat.code)}</span> · ${escapeHtml(cat.platform)} · severidad: <strong>${escapeHtml(cat.severity)}</strong></div>
+              <div><span class="ck">${escapeHtml(cat.code)}</span> · ${escapeHtml(cat.platform)} · severidad: <strong>${escapeHtml(cat.severity)}</strong> ${ftBadge}</div>
               ${cat.category ? `<div class="row"><span class="lbl">Categoría:</span> ${escapeHtml(cat.category)}</div>` : ''}
               ${cat.cause ? `<div class="row"><span class="lbl">Causa:</span> ${escapeHtml(cat.cause)}</div>` : ''}
               ${cat.solution ? `<div class="row"><span class="lbl">Solución:</span> ${escapeHtml(cat.solution)}</div>` : ''}
+              ${ft === 'replace' && cat.fix_search ? `<div class="row"><span class="lbl">Sustitución:</span> <code>${escapeHtml(cat.fix_search)}</code> → <code>${escapeHtml(cat.fix_replace || '(vacío)')}</code></div>` : ''}
               ${cat.docs_url ? `<div class="row"><a href="${escapeHtml(cat.docs_url)}" target="_blank" style="color:var(--accent);">Documentación oficial ↗</a></div>` : ''}
             </div>`;
         } else {
@@ -1436,9 +1489,14 @@ async function loadDetail(id) {
     const repairBtns = `
       <div class="repair-actions">
         <button class="btn-repair" data-act="repair" data-id="${escapeHtml(e.id)}">🔧 Arreglar con IA</button>
-        ${isPendingFix ? `<button class="btn-approve" data-act="approve" data-id="${escapeHtml(e.id)}">✓ Aplicar</button>
-                          <button class="btn-reject" data-act="reject" data-id="${escapeHtml(e.id)}">✕ Rechazar</button>` : ''}
       </div>
+      <div class="repair-actions">
+        <button class="btn-repair btn-db" data-act="autofix" data-id="${escapeHtml(e.id)}" title="Aplica la sustitución determinista del catálogo (error_catalog). Sin IA.">🗄️ Arreglar con Base de datos</button>
+      </div>
+      ${isPendingFix ? `<div class="repair-actions">
+        <button class="btn-approve" data-act="approve" data-id="${escapeHtml(e.id)}">✓ Aplicar</button>
+        <button class="btn-reject" data-act="reject" data-id="${escapeHtml(e.id)}">✕ Rechazar</button>
+      </div>` : ''}
       <div id="repairOut"></div>`;
 
     // Navegador del grupo: muestra ◀ 1/4 ▶ si hay más de una ocurrencia.
@@ -1480,6 +1538,7 @@ async function loadDetail(id) {
       b.addEventListener('click', () => {
         const act = b.dataset.act, pid = b.dataset.id;
         if (act === 'repair') doRepair(pid, b);
+        else if (act === 'autofix') doAutofix(pid, b);
         else if (act === 'approve') doApprove(pid);
         else if (act === 'reject') doReject(pid);
       });
@@ -1522,6 +1581,24 @@ async function doRepair(id, btn) {
     out.innerHTML = `<div class="repair-result failed">✕ ${escapeHtml(e.message)}<br/><span style="color:var(--muted);font-size:10px;">¿Está Ollama corriendo? Verifica con: ollama list</span></div>`;
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '🔧 Arreglar con IA'; }
+  }
+}
+
+// Arreglo determinista vía catálogo error_catalog (sin IA): /previews/:id/autofix
+async function doAutofix(id, btn) {
+  const out = $('repairOut');
+  if (btn) { btn.disabled = true; btn.textContent = '🗄️ Aplicando…'; }
+  if (out) out.innerHTML = '<div class="detail-empty">Aplicando la sustitución del catálogo (Base de datos)…</div>';
+  try {
+    const r = await fetch(`${API}/previews/${encodeURIComponent(id)}/autofix`, { method: 'POST' });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    if (out) out.innerHTML = `<div class="repair-result applied">✓ ARREGLADO con Base de datos · ${escapeHtml(j.code || '')}<br/>${j.mode === 'github' ? `PR: ${escapeHtml(j.pr?.url || j.pr?.branch || '')}` : `Backup: ${escapeHtml(j.backup || '')}`}</div>`;
+    setTimeout(() => { loadDetail(id); fetchErrors(); }, 500);
+  } catch (e) {
+    if (out) out.innerHTML = `<div class="repair-result failed">✕ ${escapeHtml(e.message)}</div>`;
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🗄️ Arreglar con Base de datos'; }
   }
 }
 
@@ -1600,6 +1677,63 @@ $('btnModeCss').addEventListener('click', () => setMode('css'));
 
 $('btnPause').addEventListener('click', () => setPaused(!state.paused));
 $('btnRefresh').addEventListener('click', () => { fetchErrors(); fetchClients(); });
+
+// Limpiar TODOS los errores detectados (borra las previews en el backend).
+async function clearAllErrors() {
+  const n = state.errors.length;
+  if (!confirm(`¿Borrar TODOS los errores detectados${n ? ` (${n} en pantalla)` : ''}? Esta acción no se puede deshacer.`)) return;
+  const btn = $('btnClearErrors');
+  const prev = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Limpiando…'; }
+  try {
+    const r = await fetch(`${API}/previews`, { method: 'DELETE', cache: 'no-store' });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    state.errors = [];
+    state.knownIds = new Set();
+    state.selectedId = null;
+    state.groupIds = [];
+    state.groupIndex = 0;
+    state.lastFeedFp = '';
+    $('alertBanner').classList.remove('show');
+    render();
+    renderSummary();
+    fetchErrors();
+    if (btn) { btn.textContent = `✓ ${j.deleted ?? 0} borrados`; setTimeout(() => { btn.textContent = '🗑 LIMPIAR ERRORES'; }, 1800); }
+  } catch (e) {
+    alert('No se pudieron limpiar los errores: ' + e.message);
+    if (btn) btn.textContent = prev;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+$('btnClearErrors').addEventListener('click', clearAllErrors);
+
+// Borra un error (o todas las ocurrencias agrupadas del mismo error).
+async function deleteErrors(ids) {
+  ids = (ids || []).filter(Boolean);
+  if (!ids.length) return;
+  const msg = ids.length > 1
+    ? `¿Borrar estas ${ids.length} ocurrencias del mismo error?`
+    : '¿Borrar este error?';
+  if (!confirm(msg)) return;
+  try {
+    await Promise.all(ids.map(id =>
+      fetch(`${API}/previews/${encodeURIComponent(id)}`, { method: 'DELETE', cache: 'no-store' })
+    ));
+    const set = new Set(ids);
+    state.errors = state.errors.filter(e => !set.has(e.id));
+    ids.forEach(id => state.knownIds.delete(id));
+    if (set.has(state.selectedId)) state.selectedId = null;
+    state.groupIds = state.groupIds.filter(id => !set.has(id));
+    if (state.groupIndex >= state.groupIds.length) state.groupIndex = Math.max(0, state.groupIds.length - 1);
+    state.lastFeedFp = '';
+    render();
+    fetchErrors();
+  } catch (e) {
+    alert('No se pudo borrar: ' + e.message);
+  }
+}
 
 // ====== Toggle de tema (VSCode → Cyber → Light → VSCode) ======
 const THEMES = ['vscode', 'cyber', 'light'];
